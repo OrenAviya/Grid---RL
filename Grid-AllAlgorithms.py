@@ -366,7 +366,7 @@ def bellman_equation(grid, p, r, gamma, theta=0.01):
 #     return V, policy
 
 def q_learning(grid, p, r, gamma, alpha=0.01, epsilon_start=0.1, epsilon_end=0.01, epsilon_decay=0.995, threshold=0.01, max_episodes=5500, max_steps=100):
-    W, H = grid.shape
+    W, H= grid.shape
     Q = np.zeros((W, H, 4))
     for x, y, v in L:
         if v == 0:
@@ -467,7 +467,7 @@ def q_values_to_policy(V, L, w, h):
     for x in range(w):
         for y in range(h):
             if not is_valid_move(x, y):
-                policy[x, y] = 'Exit'  # Or any other indicator for invalid state
+                policy[x, y] = 'wall'  # Or any other indicator for invalid state
                 continue
 
             max_value = -np.inf
@@ -506,8 +506,8 @@ V, policy = q_learning(grid, p, r, gamma)
 print("Q-Learning Value Function:")
 print_reversed_values(V)
 Q_values = V[::-1] 
+
 policy = q_values_to_policy(Q_values, L, w, h)
 print("Q-Learning Policy:")
 print(policy)
-
 
