@@ -169,3 +169,81 @@ print(policy_q)
 #     V = np.array([[np.max(Q[x, y]) for y in range(H)] for x in range(W)])
     
 #     return V, policy
+
+
+
+# def q_learning(grid, p, r, gamma, alpha=0.01, epsilon_start=0.1, epsilon_end=0.01, epsilon_decay=0.995, threshold=0.01, max_episodes=5000, max_steps=100):
+#     W, H = grid.shape
+#     Q = np.zeros((W, H, 4))
+#     for x, y, v in L:
+#         if v == 0:
+#             Q[x, y, :] = -np.inf  # Negative infinity for walls to ensure not chosen
+
+#     actions = ['up', 'down', 'left', 'right']
+#     action_indices = {'up': 0, 'down': 1, 'left': 2, 'right': 3}
+#     moves = {'up': (-1, 0), 'down': (1, 0), 'left': (0, -1), 'right': (0, 1)}
+
+#     def is_valid_move(x, y, L, w, h):
+#         return 0 <= x < h and 0 <= y < w and (x, y) not in [(gx, gy) for gx, gy, v in L if v == 0]
+
+#     def get_action(x, y, epsilon):
+#         valid_actions = [a for a in actions if is_valid_move(x + moves[a][0], y + moves[a][1], L, w, h)]
+#         if not valid_actions:
+#             return None
+#         if random.uniform(0, 1) < epsilon:
+#             return random.choice(valid_actions)
+#         else:
+#             valid_indices = [action_indices[a] for a in valid_actions]
+#             return valid_actions[np.argmax(Q[x, y, valid_indices])]
+
+#     def get_best_next_action(x, y, current_action):
+#         valid_actions = [a for a in actions if is_valid_move(x + moves[a][0], y + moves[a][1], L, w, h)]
+#         if not valid_actions:
+#             return None
+#         # Exclude the current action from consideration
+#         valid_actions = [a for a in valid_actions if a != current_action]
+#         if not valid_actions:  # No valid actions other than the current one
+#             return None
+#         valid_indices = [action_indices[a] for a in valid_actions]
+#         return valid_actions[np.argmax(Q[x, y, valid_indices])]
+
+#     epsilon = epsilon_start
+
+#     for episode in range(max_episodes):
+#         x, y = random.randint(0, h - 1), random.randint(0, w - 1)
+#         for step in range(max_steps):
+#             action = get_action(x, y, epsilon)
+#             if action is None:
+#                 break
+
+#             new_x, new_y = x + moves[action][0], y + moves[action][1]
+#             if not is_valid_move(new_x, new_y, L, w, h):
+#                 new_x, new_y = x, y
+
+#             if random.uniform(0, 1) < p:
+#                 x, y = new_x, new_y
+#             else:
+#                 alternative_moves = ['left', 'right'] if action in ['up', 'down'] else ['up', 'down']
+#                 alt_move = random.choice(alternative_moves)
+#                 x_alt, y_alt = x + moves[alt_move][0], y + moves[alt_move][1]
+#                 if is_valid_move(x_alt, y_alt, L, w, h):
+#                     x, y = x_alt, y_alt
+
+#             reward = next((v for gx, gy, v in L if gx == x and gy == y), r)
+#             if reward != r:  # Reached a terminal state (reward or penalty)
+#                 td_target = reward  # No need to consider future states for terminal states
+#             else:  # Not in a terminal state
+#                 best_next_action = get_best_next_action(x, y, action)
+#                 if best_next_action is None:
+#                     break  # No valid actions in the next state, end episode
+#                 td_target = reward + gamma * Q[x, y, action_indices[best_next_action]]
+
+#             td_error = td_target - Q[x, y, action_indices[action]]
+#             Q[x, y, action_indices[action]] += alpha * td_error
+
+#             epsilon = max(epsilon_end, epsilon_decay * epsilon)
+
+#     V = np.max(Q, axis=2)
+#     policy = np.array([[get_best_next_action(x, y, None) for y in range(H)] for x in range(W)])
+
+#     return V, policy
