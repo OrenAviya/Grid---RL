@@ -331,7 +331,7 @@ def value_iteration(grid, p, r, gamma, theta=0.01):
     policy = np.zeros((W, H), dtype=str)
     actions = ['up', 'down', 'left', 'right']
     delta = float('inf')
-    
+    goal_cells = {(gx, gy) for gx, gy, v in L}
     while delta > theta:
         delta = 0
         for x in range(W):
@@ -357,7 +357,14 @@ def value_iteration(grid, p, r, gamma, theta=0.01):
                         best_action = action
                 
                 V[x, y] = max_value
-                policy[x, y] = best_action
+    
+                if (x, y) in goal_cells:
+                    policy[x, y] = 'Exit'
+                if (x, y) in [(gx, gy) for gx, gy, v in L if v == 0]:
+                    policy[x, y] = 'Wall'
+                elif (x, y) not in goal_cells :  # Calculate the best action for valid cells
+                    policy[x, y] = best_action
+                    
                 delta = max(delta, abs(v - V[x, y]))
     
     return V, policy
