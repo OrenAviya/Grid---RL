@@ -297,7 +297,6 @@ class GridWorldQLearning(GridWorld):
 #             self.update_policy()
 #             self.T = max(0.01, self.T * 0.99)  # Cool down the temperature
 
-
 class GridWorldMDP:
     def __init__(self, W, H, L, p, r, gamma=0.5):
         self.W = W
@@ -318,26 +317,31 @@ class GridWorldMDP:
 
     def step(self, state, action):
         x, y = state
+        next_states = [(x, y)]  # Add current state for failed action probability
+
         if action == 0 and y > 0:  # Up
-            y -= 1
+            next_states.append((x, y - 1))
         elif action == 1 and y < self.H - 1:  # Down
-            y += 1
+            next_states.append((x, y + 1))
         elif action == 2 and x > 0:  # Left
-            x -= 1
+            next_states.append((x - 1, y))
         elif action == 3 and x < self.W - 1:  # Right
-            x += 1
-        
+            next_states.append((x + 1, y))
+
+        next_state_probs = [self.p] + [(1 - self.p) / (len(next_states) - 1)] * (len(next_states) - 1)
+
+        next_state = random.choices(next_states, next_state_probs)[0]
+
         # Check if new position is a wall
-        if (x, y) in [(px, py) for (px, py, reward) in self.L if reward == 0]:
+        if (next_state[0], next_state[1]) in [(px, py) for (px, py, reward) in self.L if reward == 0]:
             return state, self.r  # Stay in the same place if it's a wall
 
         reward = self.r
         for (px, py, rew) in self.L:
-            if x == px and y == py:
+            if next_state == (px, py):
                 reward += rew
                 break
 
-        next_state = (x, y)
         return next_state, reward
 
     def value_iteration(self, iterations=1000):
@@ -349,12 +353,11 @@ class GridWorldMDP:
                         action_values = []
                         for action in range(4):
                             next_state, reward = self.step((x, y), action)
-                            next_x, next_y = next_state
-                            action_value = reward + self.gamma * self.v_values[next_x, next_y]
+                            action_value = reward + self.gamma * self.v_values[next_state[0], next_state[1]]
                             action_values.append(action_value)
                         new_v_values[x, y] = max(action_values)
             self.v_values = new_v_values
-            self.update_policy()
+        self.update_policy()
 
     def update_policy(self):
         for x in range(self.W):
@@ -363,8 +366,7 @@ class GridWorldMDP:
                     action_values = []
                     for action in range(4):
                         next_state, reward = self.step((x, y), action)
-                        next_x, next_y = next_state
-                        action_value = reward + self.gamma * self.v_values[next_x, next_y]
+                        action_value = reward + self.gamma * self.v_values[next_state[0], next_state[1]]
                         action_values.append(action_value)
                     self.policy[x, y] = np.argmax(action_values)
 
@@ -383,11 +385,6 @@ class GridWorldMDP:
                     print(directions[best_action], end=" ")
             print()
 
-    def print_v_values(self):
-        for y in range(self.H):
-            for x in range(self.W):
-                print( self.v_values[x, y] , end = " ")
-            print()
 
 
 
