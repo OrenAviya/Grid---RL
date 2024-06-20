@@ -220,7 +220,7 @@ def compute_distances(matrix1, matrix2):
     return np.abs(matrix1 - matrix2)
 
 def run_experiments(W, H, L, p, r):
-    print("MDP Value Iteration")
+    print("MDP value Iteration")
     mdp = GridWorldMDP(W, H, L, p, r)
     mdp.value_iteration()
     mdp.print_policy()
@@ -266,11 +266,6 @@ def run_experiments(W, H, L, p, r):
     print("\n")
 
 # Example use-case with parameters:
-# w = 12
-# h = 4
-# L = [(1,0,-100),(2,0,-100),(3,0,-100),(4,0,-100),(5,0,-100),(6,0,-100),(7,0,-100),(8,0,-100),(9,0,-100),(10,0,-100),(11,0,0.1)]
-# p = 1
-# r = -1
 w = 4
 h = 3
 L = [(1,1,0),(3,2,1),(3,1,-1)]
