@@ -230,7 +230,7 @@ w = 4
 h = 3
 L = [(1,1,0),(3,2,1),(3,1,-1)]
 p = 0.8
-r = -0.04
+r = 0.04
 
 def transform_coordinates(L, w, h):
         # Assuming L is a list of (x, y, v) tuples

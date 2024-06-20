@@ -1,249 +1,286 @@
-import random
 import numpy as np
+import random
 
-# נתונים לדוגמה
-W, H = 5, 5  # מימדי הלוח
-L = [(1, 2, 10), (3, 4, -5), (2, 2, 0)]  # פרסים, עונשים וקירות
-p = 0.8  # סיכוי הצלחת הצעד
-r = -1  # עלות הצעד
-gamma = 0.5  # גורם הנחה
+class GridWorld:
+    def __init__(self, W, H, L, p, r, gamma=0.5):
+        self.W = W
+        self.H = H
+        self.L = L
+        self.p = p
+        self.r = r
+        self.gamma = gamma
+        self.T = 1.0  # Initial temperature for Boltzmann Exploration
+        self.q_values = np.zeros((W, H, 4))  # 4 possible actions (up, down, left, right)
+        self.policy = np.ones((W, H, 4)) / 4  # Initial policy is uniform random
+        self.experience = []
 
-# יצירת לוח המשחק
-grid = np.zeros((W, H))
-for (x, y, reward) in L:
-    grid[x, y] = reward
+    def is_terminal(self, state):
+        x, y = state
+        for (px, py, reward) in self.L:
+            if x == px and y == py and reward != 0:
+                return True
+        return False
 
+    def step(self, state, action):
+        x, y = state
+        if random.random() > self.p:
+            action = (action + random.choice([-1, 1])) % 4
 
-def q_learning(grid, p, r, gamma, alpha=0.1, epsilon=0.1, episodes=1000):
-    W, H = grid.shape
-    Q = np.zeros((W, H, 4))  # 4 for ['up', 'down', 'left', 'right']
-    actions = ['up', 'down', 'left', 'right']
+        if action == 0 and y > 0:  # Up
+            y -= 1
+        elif action == 1 and y < self.H - 1:  # Down
+            y += 1
+        elif action == 2 and x > 0:  # Left
+            x -= 1
+        elif action == 3 and x < self.W - 1:  # Right
+            x += 1
+
+        # Check if new position is a wall
+        if (x, y) in [(px, py) for (px, py, reward) in self.L if reward == 0]:
+            x, y = state  # Stay in the same place if it's a wall
+
+        reward = self.r
+        for (px, py, rew) in self.L:
+            if x == px and y == py:
+                reward += rew
+                break
+
+        next_state = (x, y)
+        return next_state, reward
+
+    def boltzmann_exploration(self, state):
+        q_values = self.q_values[state[0], state[1]]
+        # Normalize Q-values to prevent overflow
+        max_q = np.max(q_values)
+        exp_values = np.exp((q_values - max_q) / self.T)
+        probabilities = exp_values / np.sum(exp_values)
+        action = np.random.choice(np.arange(4), p=probabilities)
+        return action
+
+    def update_q_values(self):
+        for (i, a, r, j) in self.experience:
+            x, y = i
+            next_x, next_y = j
+            best_next_action = np.argmax(self.q_values[next_x, next_y])
+            td_target = r + self.gamma * self.q_values[next_x, next_y, best_next_action]
+            self.q_values[x, y, a] += 0.1 * (td_target - self.q_values[x, y, a])
+
+    def update_policy(self):
+        for x in range(self.W):
+            for y in range(self.H):
+                if (x, y) not in [(px, py) for (px, py, reward) in self.L]:
+                    best_action = np.argmax(self.q_values[x, y])
+                    self.policy[x, y] = np.eye(4)[best_action]
+
+    def run(self, iterations=1000):
+        for _ in range(iterations):
+            state = (random.randint(0, self.W - 1), random.randint(0, self.H - 1))
+            while not self.is_terminal(state):
+                action = self.boltzmann_exploration(state)
+                next_state, reward = self.step(state, action)
+                self.experience.append((state, action, reward, next_state))
+                state = next_state
+            self.update_q_values()
+            self.update_policy()
+            self.T = max(0.01, self.T * 0.99)  # Cool down the temperature
+
+    def print_policy(self):
+        directions = [" ↑ ", " ↓ ", " ← ", " → ", " █ ", " E "]
+        for y in range(self.H):
+            for x in range(self.W):
+                if (x, y) in [(px, py) for (px, py, reward) in self.L if reward == 0]:
+                    best_action = 4
+                    print(directions[best_action], end=" ")
+                elif (x, y) in [(px, py) for (px, py, reward) in self.L if reward != 0]:
+                    best_action = 5
+                    print(directions[best_action], end=" ")
+                else:
+                    best_action = np.argmax(self.policy[x, y])
+                    print(directions[best_action], end=" ")
+            print()
+
+    def print_q_values(self):
+        for y in range(self.H):
+            for x in range(self.W):
+                if (x, y) not in [(px, py) for (px, py, reward) in self.L]:
+                    print(f"{np.max(self.q_values[x, y]):.3f}", end=" ")
+                elif (x, y) in [(px, py) for (px, py, reward) in self.L if reward == 0 ]:
+                    print("W" , end=" ")
+                elif (x, y) in [(px, py) for (px, py, reward) in self.L if reward != 0 ]:
+                    print("E", end=" ")
+            print()
+
+class GridWorldQLearning(GridWorld):
+    def __init__(self, W, H, L, p, r, gamma=0.5):
+        super().__init__(W, H, L, p, r, gamma)
+
+    def update_q_values(self, state, action, reward, next_state):
+        x, y = state
+        next_x, next_y = next_state
+        best_next_action = np.argmax(self.q_values[next_x, next_y])
+        td_target = reward + self.gamma * self.q_values[next_x, next_y, best_next_action]
+        self.q_values[x, y, action] += 0.1 * (td_target - self.q_values[x, y, action])
+
+    def run(self, episodes=1000):
+        for _ in range(episodes):
+            state = (random.randint(0, self.W - 1), random.randint(0, self.H - 1))
+            while not self.is_terminal(state):
+                action = self.boltzmann_exploration(state)
+                next_state, reward = self.step(state, action)
+                self.update_q_values(state, action, reward, next_state)
+                state = next_state
+            self.update_policy()
+            self.T = max(0.01, self.T * 0.99)  # Cool down the temperature
+
+class GridWorldMDP:
+    def __init__(self, W, H, L, p, r, gamma=0.5):
+        self.W = W
+        self.H = H
+        self.L = L
+        self.p = p
+        self.r = r
+        self.gamma = gamma
+        self.v_values = np.zeros((W, H))  # ערכי V
+        self.policy = np.zeros((W, H), dtype=int)  # הפוליסי
+
+    def is_terminal(self, state):
+        x, y = state
+        for (px, py, reward) in self.L:
+            if x == px and y == py and reward != 0:
+                return True
+        return False
+
+    def step(self, state, action):
+        x, y = state
+        if action == 0 and y > 0:  # Up
+            y -= 1
+        elif action == 1 and y < self.H - 1:  # Down
+            y += 1
+        elif action == 2 and x > 0:  # Left
+            x -= 1
+        elif action == 3 and x < self.W - 1:  # Right
+            x += 1
+        
+        # Check if new position is a wall
+        if (x, y) in [(px, py) for (px, py, reward) in self.L if reward == 0]:
+            return state, self.r  # Stay in the same place if it's a wall
+
+        reward = self.r
+        for (px, py, rew) in self.L:
+            if x == px and y == py:
+                reward += rew
+                break
+
+        next_state = (x, y)
+        return next_state, reward
+
+    def value_iteration(self, iterations=1000):
+        for _ in range(iterations):
+            new_v_values = np.copy(self.v_values)
+            for x in range(self.W):
+                for y in range(self.H):
+                    if not self.is_terminal((x, y)):
+                        action_values = []
+                        for action in range(4):
+                            next_state, reward = self.step((x, y), action)
+                            next_x, next_y = next_state
+                            action_value = reward + self.gamma * self.v_values[next_x, next_y]
+                            action_values.append(action_value)
+                        new_v_values[x, y] = max(action_values)
+                        self.policy[x, y] = np.argmax(action_values)
+            self.v_values = new_v_values
+
+    def print_policy(self):
+        directions = [" ↑ ", " ↓ ", " ← ", " → ", " █ ", " E "]
+        for y in range(self.H):
+            for x in range(self.W):
+                if (x, y) in [(px, py) for (px, py, reward) in self.L if reward == 0]:
+                    best_action = 4
+                    print(directions[best_action], end=" ")
+                elif (x, y) in [(px, py) for (px, py, reward) in self.L if reward != 0]:
+                    best_action = 5
+                    print(directions[best_action], end=" ")
+                else:
+                    best_action = self.policy[x, y]
+                    print(directions[best_action], end=" ")
+            print()
+
+    def print_v_values(self):
+        for y in range(self.H):
+            for x in range(self.W):
+                if (x, y) not in [(px, py) for (px, py, reward) in self.L]:
+                    print(f"{self.v_values[x, y]:.3f}", end=" ")
+                elif (x, y) in [(px, py) for (px, py, reward) in self.L if reward == 0 ]:
+                    print("W" , end=" ")
+                elif (x, y) in [(px, py) for (px, py, reward) in self.L if reward != 0 ]:
+                    print("E", end=" ")
+            print()
+
+def compute_distances(matrix1, matrix2):
+    return np.abs(matrix1 - matrix2)
+
+def run_experiments(W, H, L, p, r):
+    print("MDP Value Iteration")
+    mdp = GridWorldMDP(W, H, L, p, r)
+    mdp.value_iteration()
+    mdp.print_policy()
+    print("V Values:")
+    mdp.print_v_values()
+    v_values = mdp.v_values
+    print("\n")
+
+    print("Model-Based Reinforcement Learning (MBRL)")
+    mbrl = GridWorld(W, H, L, p, r)
+    mbrl.run()
+    mbrl.print_policy()
+    print(" Values:")
+    mbrl.print_q_values()
+    mbrl_values_max = np.max(mbrl.q_values, axis=2)
+    print("\n")
+
+    print("Model-Free Reinforcement Learning (MFRL)")
+    qlearning = GridWorldQLearning(W, H, L, p, r)
+    qlearning.run()
+    qlearning.print_policy()
+    print("Q Values:")
+    qlearning.print_q_values()
+    q_values_max = np.max(qlearning.q_values, axis=2)
+    print("\n")
     
-    def get_action(x, y):
-        if random.uniform(0, 1) < epsilon:
-            return random.choice(actions)
-        else:
-            return actions[np.argmax(Q[x, y])]
-    
-    for _ in range(episodes):
-        x, y = random.randint(0, W-1), random.randint(0, H-1)
-        while grid[x, y] == 0:
-            action = get_action(x, y)
-            if action == 'up':
-                new_x = max(x - 1, 0)
-                new_y = y
-            elif action == 'down':
-                new_x = min(x + 1, W - 1)
-                new_y = y
-            elif action == 'left':
-                new_x = x
-                new_y = max(y - 1, 0)
-            elif action == 'right':
-                new_x = x
-                new_y = min(y + 1, H - 1)
-            
-            reward = grid[new_x, new_y]
-            best_next_action = np.argmax(Q[new_x, new_y])
-            td_target = reward + gamma * Q[new_x, new_y, best_next_action] - r
-            td_error = td_target - Q[x, y, actions.index(action)]
-            Q[x, y, actions.index(action)] += alpha * td_error
-            
-            x, y = new_x, new_y
-    
-    policy = np.array([[actions[np.argmax(Q[x, y])] for y in range(H)] for x in range(W)])
-    V = np.array([[np.max(Q[x, y]) for y in range(H)] for x in range(W)])
-    
-    return V, policy
 
-V_q, policy_q = q_learning(grid, p, r, gamma)
-print("Q-Learning Value Function:")
-print(V_q)
-print("Q-Learning Policy:")
-print(policy_q)
+    # Computing distances
+    distance_mbrl_mdp = compute_distances(mbrl_values_max, v_values)
+    distance_mfrl_mdp = compute_distances(q_values_max, v_values)
+    distance_mbrl_mfrl = compute_distances(mbrl_values_max, q_values_max)
 
+    print("Distance between MBRL and MDP values:")
+    print(np.transpose(distance_mbrl_mdp))
+    print("\n")
 
+    print("Distance between MFRL and MDP values:")
+    print(np.transpose(distance_mfrl_mdp))
+    print("\n")
 
-# def q_learning(w, h, L, p, r, gamma=0.5, alpha=0.1, epsilon_start=1.0, epsilon_end=0.01, epsilon_decay=0.995, threshold=0.01, max_episodes=1000):
-#     Q = np.zeros((w, h, 4))
-#     for x, y, v in L:
-#         if v == 0:
-#             Q[x, y, :] = -10  # ערך Q נמוך מאוד לקירות
+    print("Distance between MFRL and MBRL values:")
+    print(np.transpose(distance_mbrl_mfrl))
+    print("\n")
 
-#     actions = ['up', 'down', 'left', 'right']
-#     action_indices = {'up': 0, 'down': 1, 'left': 2, 'right': 3}
-    
-#     def is_valid_move(x, y, L, w, h):
-#         return 0 <= x < w and 0 <= y < h and (x, y) not in [(gx, gy) for gx, gy, v in L if v == 0]
+# Example use-case with parameters:
+# w = 12
+# h = 4
+# L = [(1,0,-100),(2,0,-100),(3,0,-100),(4,0,-100),(5,0,-100),(6,0,-100),(7,0,-100),(8,0,-100),(9,0,-100),(10,0,-100),(11,0,0.1)]
+# p = 1
+# r = -1
+w = 4
+h = 3
+L = [(1,1,0),(3,2,1),(3,1,-1)]
+p = 0.8
+r = -0.04
 
-#     def get_action(x, y, epsilon):
-#         valid_actions = [a for a in actions if is_valid_move(x + (a == 'down') - (a == 'up'), y + (a == 'right') - (a == 'left'), L, w, h)]
-#         if not valid_actions:
-#             return 'none'
-#         if random.uniform(0, 1) < epsilon:
-#             return random.choice(valid_actions)
-#         else:
-#             valid_indices = [action_indices[a] for a in valid_actions]
-#             return actions[valid_indices[np.argmax(Q[x, y, valid_indices])]]
+def transform_coordinates(L, w, h):
+        # Assuming L is a list of (x, y, v) tuples
+        return [(x, h - 1 - y, v) for x, y, v in L]  # Adjusted for numpy indexing
 
-#     epsilon = epsilon_start
+L = transform_coordinates(L, w, h)
 
-#     for episode in range(max_episodes):
-#         x, y = random.randint(0, w - 1), random.randint(0, h - 1)
-#         while True:
-#             action = get_action(x, y, epsilon)
-#             if action == 'none':
-#                 break
-            
-#             if action == 'up':
-#                 new_x, new_y = max(x - 1, 0), y
-#             elif action == 'down':
-#                 new_x, new_y = min(x + 1, w - 1), y
-#             elif action == 'left':
-#                 new_x, new_y = x, max(y - 1, 0)
-#             elif action == 'right':
-#                 new_x, new_y = x, min(y + 1, h - 1)
-
-#             if not is_valid_move(new_x, new_y, L, w, h):
-#                 new_x, new_y = x, y  # הישאר במקום אם המהלך לא חוקי
-
-#             if random.uniform(0, 1) < p:
-#                 x, y = new_x, new_y
-
-#             reward = next((v for gx, gy, v in L if gx == x and gy == y), r)
-#             best_next_action = np.argmax(Q[x, y])
-#             td_target = reward + gamma * Q[x, y, best_next_action]
-#             td_error = td_target - Q[x, y, action_indices[action]]
-#             Q[x, y, action_indices[action]] += alpha * td_error
-
-#             if reward != r:
-#                 break
-
-#             if np.max(np.abs(td_error)) < threshold:
-#                 break
-
-#         epsilon = max(epsilon_end, epsilon_decay * epsilon)
-
-#     policy = np.array([[get_action(x, y, 0) for y in range(h)] for x in range(w)])
-#     V = np.array([[np.max(Q[x, y]) if is_valid_move(x, y, L, w, h) else -10 for y in range(h)] for x in range(w)])
-
-#     return V, policy
-
-
-# def q_learning(grid, p, r, gamma, alpha=0.1, epsilon=0.1, episodes=1000):
-#     W, H = grid.shape
-#     Q = np.zeros((W, H, 4))  # 4 for ['up', 'down', 'left', 'right']
-#     actions = ['up', 'down', 'left', 'right']
-    
-#     def get_action(x, y):
-#         if random.uniform(0, 1) < epsilon:
-#             return random.choice(actions)
-#         else:
-#             return actions[np.argmax(Q[x, y])]
-    
-#     for _ in range(episodes):
-#         x, y = random.randint(0, W-1), random.randint(0, H-1)
-#         while grid[x, y] == 0:
-#             action = get_action(x, y)
-#             if action == 'up':
-#                 new_x = max(x - 1, 0)
-#                 new_y = y
-#             elif action == 'down':
-#                 new_x = min(x + 1, W - 1)
-#                 new_y = y
-#             elif action == 'left':
-#                 new_x = x
-#                 new_y = max(y - 1, 0)
-#             elif action == 'right':
-#                 new_x = x
-#                 new_y = min(y + 1, H - 1)
-            
-#             reward = grid[new_x, new_y]
-#             best_next_action = np.argmax(Q[new_x, new_y])
-#             td_target = reward + gamma * Q[new_x, new_y, best_next_action] - r
-#             td_error = td_target - Q[x, y, actions.index(action)]
-#             Q[x, y, actions.index(action)] += alpha * td_error
-            
-#             x, y = new_x, new_y
-    
-#     policy = np.array([[actions[np.argmax(Q[x, y])] for y in range(H)] for x in range(W)])
-#     V = np.array([[np.max(Q[x, y]) for y in range(H)] for x in range(W)])
-    
-#     return V, policy
-
-
-
-# def q_learning(grid, p, r, gamma, alpha=0.01, epsilon_start=0.1, epsilon_end=0.01, epsilon_decay=0.995, threshold=0.01, max_episodes=5000, max_steps=100):
-#     W, H = grid.shape
-#     Q = np.zeros((W, H, 4))
-#     for x, y, v in L:
-#         if v == 0:
-#             Q[x, y, :] = -np.inf  # Negative infinity for walls to ensure not chosen
-
-#     actions = ['up', 'down', 'left', 'right']
-#     action_indices = {'up': 0, 'down': 1, 'left': 2, 'right': 3}
-#     moves = {'up': (-1, 0), 'down': (1, 0), 'left': (0, -1), 'right': (0, 1)}
-
-#     def is_valid_move(x, y, L, w, h):
-#         return 0 <= x < h and 0 <= y < w and (x, y) not in [(gx, gy) for gx, gy, v in L if v == 0]
-
-#     def get_action(x, y, epsilon):
-#         valid_actions = [a for a in actions if is_valid_move(x + moves[a][0], y + moves[a][1], L, w, h)]
-#         if not valid_actions:
-#             return None
-#         if random.uniform(0, 1) < epsilon:
-#             return random.choice(valid_actions)
-#         else:
-#             valid_indices = [action_indices[a] for a in valid_actions]
-#             return valid_actions[np.argmax(Q[x, y, valid_indices])]
-
-#     def get_best_next_action(x, y, current_action):
-#         valid_actions = [a for a in actions if is_valid_move(x + moves[a][0], y + moves[a][1], L, w, h)]
-#         if not valid_actions:
-#             return None
-#         # Exclude the current action from consideration
-#         valid_actions = [a for a in valid_actions if a != current_action]
-#         if not valid_actions:  # No valid actions other than the current one
-#             return None
-#         valid_indices = [action_indices[a] for a in valid_actions]
-#         return valid_actions[np.argmax(Q[x, y, valid_indices])]
-
-#     epsilon = epsilon_start
-
-#     for episode in range(max_episodes):
-#         x, y = random.randint(0, h - 1), random.randint(0, w - 1)
-#         for step in range(max_steps):
-#             action = get_action(x, y, epsilon)
-#             if action is None:
-#                 break
-
-#             new_x, new_y = x + moves[action][0], y + moves[action][1]
-#             if not is_valid_move(new_x, new_y, L, w, h):
-#                 new_x, new_y = x, y
-
-#             if random.uniform(0, 1) < p:
-#                 x, y = new_x, new_y
-#             else:
-#                 alternative_moves = ['left', 'right'] if action in ['up', 'down'] else ['up', 'down']
-#                 alt_move = random.choice(alternative_moves)
-#                 x_alt, y_alt = x + moves[alt_move][0], y + moves[alt_move][1]
-#                 if is_valid_move(x_alt, y_alt, L, w, h):
-#                     x, y = x_alt, y_alt
-
-#             reward = next((v for gx, gy, v in L if gx == x and gy == y), r)
-#             if reward != r:  # Reached a terminal state (reward or penalty)
-#                 td_target = reward  # No need to consider future states for terminal states
-#             else:  # Not in a terminal state
-#                 best_next_action = get_best_next_action(x, y, action)
-#                 if best_next_action is None:
-#                     break  # No valid actions in the next state, end episode
-#                 td_target = reward + gamma * Q[x, y, action_indices[best_next_action]]
-
-#             td_error = td_target - Q[x, y, action_indices[action]]
-#             Q[x, y, action_indices[action]] += alpha * td_error
-
-#             epsilon = max(epsilon_end, epsilon_decay * epsilon)
-
-#     V = np.max(Q, axis=2)
-#     policy = np.array([[get_best_next_action(x, y, None) for y in range(H)] for x in range(W)])
-
-#     return V, policy
+run_experiments(w, h, L, p, r)
