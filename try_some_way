@@ -2,25 +2,15 @@
 import numpy as np
 import random
 
-# נתונים לדוגמה
-# w = 4
-# h = 3
-# L = [(1, 1, 0), (0, 3, 1), (1, 3, -1)]
-# p = 0.8
-# r = -1
-# gamma = 0.5  # גורם הנחה
-
-# דוגמה לשימוש בפונקציה עם הנתונים הנתונים לדוגמה:
-
 def transform_coordinates(L, w, h):
     # Assuming L is a list of (x, y, v) tuples
     return [(h - 1 - y, x, v) for x, y, v in L]  # Adjusted for numpy indexing
 
-w = 7
-h = 7
-L = [(1,1,-4),(1,5,-6),(5,1,1),(5,5,4)]
-p = 0.8
-r = -0.5
+w = 12
+h = 4
+L = [(1,0,-100),(2,0,-100),(3,0,-100),(4,0,-100),(5,0,-100),(6,0,-100),(7,0,-100),(8,0,-100),(9,0,-100),(10,0,-100),(11,0,0.1)]
+p = 1
+r = -1
 
 
 gamma = 0.5
@@ -113,7 +103,7 @@ def bellman_equation(grid, p, r, gamma, theta=0.01):
     
     return V
 
-def q_learning(grid, p, r, gamma, alpha=0.01, epsilon=0.1, max_episodes=15000, max_steps=200):
+def q_learning(grid, p, r, gamma, alpha=0.01, epsilon=0.1, max_episodes=15000, max_steps=100):
     W, H = grid.shape
     Q = np.zeros((W, H, 4))
     for x, y, v in L:
@@ -234,6 +224,6 @@ V, policy = q_learning(grid, p, r, gamma)
 print("Q-Learning Value Function:")
 print(V)
 # policy improvement
-policy = q_values_to_policy(V, L, w, h)
+# policy = q_values_to_policy(V, L, w, h)
 print("Q-Learning Policy:")
 print(policy)
